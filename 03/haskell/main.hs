@@ -35,9 +35,18 @@ solution2 input = scrub * oxRate
     oxRate = bitsToInt $ findVal (lines input) id
     scrub = bitsToInt $ findVal (lines input) (xor 1)
 
+-- A solution to part 1 that's probably too clever...
+solution' :: String -> Int
+solution' input = bitsToInt epsilon * bitsToInt gamma
+  where
+    gamma = map (fromEnum . (> breakEven)) $ foldl1 (zipWith (+)) $ map (map digitToInt) $ lines input
+    epsilon = map (xor 1) gamma
+    breakEven = length (lines input) `div` 2
+
 main = do
   handle <- openFile "input.txt" ReadMode
   contents <- hGetContents handle
-  -- print (solution contents)
-  print (solution2 contents)
+  print (solution contents)
+  print (solution' contents)
+  -- print (solution2 contents)
   hClose handle
