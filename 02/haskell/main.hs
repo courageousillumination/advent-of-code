@@ -24,7 +24,7 @@ commandValueParser = read <$> (spaces *> many1 digit)
 
 -- Maps the raw input into a list of commands.
 processInput :: String -> [Command]
-processInput input = rights $ map (parse commandParser "bad command") $ lines input
+processInput input = rights $ map (parse commandParser "Invalid Command") $ lines input
 
 -- Part 1
 strategy1 :: SubState -> Command -> SubState
