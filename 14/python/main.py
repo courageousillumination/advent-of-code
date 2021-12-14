@@ -3,7 +3,6 @@ def optimized(lines):
     template = lines[0].strip()
     rules = [x.strip().split(" -> ") for x in lines[2:]]
     rules = {x: y for [x,y] in rules}
-    print(rules)
     # Map from pairs -> pairs
     pairs = {}
     for i in range(len(template)-1):
@@ -28,42 +27,10 @@ def optimized(lines):
 
     final_count = defaultdict(lambda: 0)
     for x in pairs:
-       
         final_count[x[0]] += pairs[x]
     final_count[last_pair[1]] += 1
     z = (sorted([(final_count[x], x) for x in final_count]))
     print(z[-1][0] - z[0][0]) # Could be off by one in either direction
-
-def solution(lines):
-   template = lines[0].strip()
-   rules = [x.strip().split(" -> ") for x in lines[2:]]
-   
-   for _ in range(0, 40):
-    print(_)
-    next = ""
-    for i in range(len(template)-1):
-        pair = template[i:i+2]
-        found_rule = False
-        for [a, b] in rules:
-            # print(a)
-            if a == pair:
-                next += template[i]
-                next += b
-                found_rule = True
-                break
-        if not found_rule:
-            next += template[i]
-            
-    next += template[-1]
-    template = next
-   res = {}
-   for x in template:
-       if x in res:
-           res[x] += 1
-       else:
-           res[x] = 1
-   print(res)
-#    print(next)
 
 with open('input.txt') as f:
     lines = f.readlines()
