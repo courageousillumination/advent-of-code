@@ -1,11 +1,4 @@
 import math
-# def get_deltas(beacon):
-#     deltas = []
-#     b0 = beacon
-#     for i in range(len(b0)):
-#         for j in range(i+1, len(b0)):
-#             deltas.append(get_delta(b0[i], b0[j]))
-#     return deltas
 
 def get_delta(p1, p2):
     return (sorted((abs(p1[0] - p2[0]), 
@@ -16,8 +9,6 @@ def get_raw_delta(p1, p2):
     return ((((p1[0] - p2[0]), 
               (p1[1] - p2[1]), 
               (p1[2] - p2[2]))))
-
-
 
 def distance_to_origin(beacon):
     x,y,z = beacon
