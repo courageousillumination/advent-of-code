@@ -14,17 +14,10 @@ def refine(image, algo):
             p8 = image[i+1][j]
             p9 = image[i+1][j+1]
 
-            
             b = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9
-
-            # print(b)
-            # print(b)
             c = ''.join(['0' if x == '.' else '1' for x in b])
             indx = int(c,2)
 
-            # print(c, indx, algo[indx])
-            # print(indx, c)
-            # print(algo)
             new_image[i][j] = algo[indx]
     
     next = '#' if new_image[0][0] == '.' else "."
@@ -41,8 +34,6 @@ def refine(image, algo):
 def solution(lines):
     algo = lines[0]
     image = [[y for y in x.strip()] for x in lines[2:]]
-    # expand image for infinite plane
-    # for x in range(0, 10):
     for i in range(len(image)):
         image[i] = ["."] * 100 + image[i] + ["."] * 100
     image_line_length = len(image[0])
