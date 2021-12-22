@@ -22,8 +22,8 @@ def get_next_dice(dice):
 counts = {6: 7, 5: 6, 7: 6, 8: 3, 4: 3, 9: 1, 3: 1}
 
 
-MAX_SCORE = 5
-@functools.lru_cache()
+MAX_SCORE = 21
+@functools.lru_cache(maxsize=None)
 def count_winners(player1Score, player2Score, player1Pos, player2Pos, active):
     if player1Score >= MAX_SCORE:
         return (1, 0)
@@ -58,10 +58,6 @@ def move_player(pos, x):
         # print(pos)
     return pos
 def solution():
-    res = count_winners(0, 0, 1, 2, 0)
-    print(res)
-
-    return
     player1Pos = 1
     player2Pos = 2
     player1Points = 0
@@ -110,18 +106,16 @@ def solution():
             if player1Points >= 1000:
                 break
         activePlayer = (activePlayer + 1) % 2
-        # print(player1Points, player1Pos)
-        # break
+        
     r = rolls -1 
     if player1Points < player2Points:
         print(player1Points * r)
     else:
         print(player2Points * r)
     print(player1Points, player2Points, r)
+    # Part 2
+    res = count_winners(0, 0, 1, 2, 0)
+    print(res)
 
-
-
-# with open('input.txt') as f:
-    # lines = f.readlines()
 solution()
    
