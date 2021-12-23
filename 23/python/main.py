@@ -1,6 +1,6 @@
 import functools
 
-def target_col(grid, x, target_col):
+def target_col(grid, x, target_col, val):
     no_path = False
     if x < target_col:
         for x in range(x + 1, target_col):
@@ -12,27 +12,35 @@ def target_col(grid, x, target_col):
                 no_path = True   
     if no_path:
         return []
-    if grid[2][target_col] == '.':
-        return [(target_col, 2)]
-    return [(target_col, 1)]
 
-def explore_moves(grid, pos):
+    for y in range(len(grid)-1, 0, -1):
+        v = grid[y][target_col]
+        if v != '.' and v != val:
+            return [] # Don't go in, it's not empty
+    
+    for y in range(len(grid)-1, 0, -1):
+        if grid[y][target_col] == '.':
+            return [(target_col, y)]
+
+    print("Never happens")
+
+def explore_moves(grid, pos, val):
     (x,y) = pos
     valid_moves = []
 
-    if grid[y][x] == 'D' and x == 8:
+    if val == 'D' and x == 8 and check_column(grid, 8, 'D',True):
         return []
-    if grid[y][x] == 'C' and x == 6:
+    if val == 'C' and x == 6 and  check_column(grid, 6, 'C',True):
         return []
-    if grid[y][x] == 'B' and x == 4:
+    if val == 'B' and x == 4 and check_column(grid, 4, 'B', True):
         return []
-    if grid[y][x] == 'A' and x == 2:
+    if val == 'A' and x == 2 and check_column(grid, 2, 'A', True):
         return []
-        
-    if y == 2:
+
+    if y >= 2:
         if grid[y-1][x] != '.':
             return [] # Fully blocked
-        return explore_moves(grid, (x, y-1))
+        return explore_moves(grid, (x, y-1), val)
     if y == 1:
         valid_x_left = x - 1
         while valid_x_left >= 0:
@@ -52,16 +60,20 @@ def explore_moves(grid, pos):
                 valid_x_left += 1
             else:
                 break
+    
+    if val == 'D':
+        end_pos = target_col(grid, x, 8, 'D')
+    elif val == 'C':
+        end_pos = target_col(grid, x, 6, 'C')
+    elif val == 'B':
+        end_pos = target_col(grid, x, 4, 'B')
+    elif val == 'A':
+        end_pos = target_col(grid, x, 2, 'A')
+    
+    
     if y == 0:
-        if grid[y][x] == 'D':
-            return target_col(grid, x, 8)
-        if grid[y][x] == 'C':
-            return target_col(grid, x, 6)
-        if grid[y][x] == 'B':
-            return target_col(grid, x, 4)
-        if grid[y][x] == 'A':
-            return target_col(grid, x, 2)
-    return valid_moves
+        return end_pos
+    return valid_moves + end_pos
 
 def make_move(grid, pos1, pos2):
     g = [[x for x in row] for row in grid]
@@ -72,20 +84,22 @@ def make_move(grid, pos1, pos2):
     return g
 
 
-def check_column(grid, col, val):
+def check_column(grid, col, val, partial=False):
     for y in range(1, len(grid)):
-        if grid[y][col] != val:
-            return False
+        v = grid[y][col]
+        if partial:
+            if v != val and v != '.':
+                return False
+        else:
+            if v != val:
+                return False
     return True
+
 def is_done(grid):
-
-
     return (check_column(grid, 2, 'A') and
-            grid[1][4] == grid[2][4] == 'B' and
-            grid[1][6] == grid[2][6] == 'C' and
-            grid[1][8] == grid[2][8] == 'D')
-
-OPTIMAL = 20000
+            check_column(grid, 4, 'B')and
+            check_column(grid, 6, 'C') and
+            check_column(grid, 8, 'D'))
 
 def grid_to_string(grid):
     return '\n'.join([' '.join(x) for x in grid])
@@ -96,28 +110,17 @@ def string_to_grid(str):
 @functools.lru_cache(maxsize=None)
 def get_optimal_grid(grid):
     grid = string_to_grid(grid)
-    # if move_count >= 10:
-    #     print(grid)
-    # if currentCost > 20000 or move_count > 20:
-    #     return 20000 # Not the best
-
     if is_done(grid):
+        print("Finished!")
         return 0
-
-    
-    
-    optimal = 20000
+    optimal = float("infinity")
     for y in range(len(grid)):
         for x in range(len(grid[y])):
             char = grid[y][x]
             if char != '#' and char != '.':
-                moves = explore_moves(grid, (x,y))
-                # if char == 'D':
-                #     print(moves, (x,y))
-                # print(moves)
+                # print(grid[y][x])
+                moves = explore_moves(grid, (x,y), char)
                 for move in moves:
-                    # if (move_count <= 1):
-                    #     print("in here", move_count, len(moves))
                     g1 = make_move(grid, (x, y), move)
                     if char == 'A':
                         mult = 1
@@ -127,17 +130,15 @@ def get_optimal_grid(grid):
                         mult = 100
                     else:
                         mult = 1000
-                    cost = (abs(x - move[0]) + abs(y - move[1])) * mult
+
+                    x_cost = abs(x - move[0])
+                    y_cost = y + move[1]
+                    cost = (x_cost + y_cost) * mult # Needs to be recomputed
                     best = cost + get_optimal_grid(grid_to_string(g1))
                     optimal = min(best, optimal)
-                    global OPTIMAL
-                    # if (optimal < OPTIMAL):
-                    #     print("Got new optimal", optimal)
-                    #     OPTIMAL = optimal
-                    
     return optimal
-def solution(lines):
 
+def solution(lines):
     grid = [
         ['.','.','.','.','.','.','.','.','.','.','.'],
         ['#','#','D','#','C','#','A','#','B','#','#'],
@@ -147,10 +148,18 @@ def solution(lines):
     ]
 
     # grid = [
-    #     ['.','.','.','.','.','.','.','D','.','.','.'],
-    #     ['#','#','A','#','B','#','C','#','.','#','#'],
-    #     ['#','#','A','#','B','#','C','#','D','#','#']
+    #     ['.','.','.','.','.','.','.','.','.','.','.'],
+    #     ['#','#','B','#','C','#','B','#','D','#','#'],
+    #     ['#','#','D','#','C','#','B','#','A','#','#'],
+    #     ['#','#','D','#','B','#','A','#','C','#','#'],
+    #     ['#','#','A','#','D','#','C','#','A','#','#']
     # ]
+
+    grid = [
+        ['.','.','.','.','.','.','.','.','.','.','.'],
+        ['#','#','B','#','A','#','C','#','D','#','#'],
+        ['#','#','A','#','B','#','C','#','D','#','#']
+    ]
 
     print(get_optimal_grid(grid_to_string(grid)))
 

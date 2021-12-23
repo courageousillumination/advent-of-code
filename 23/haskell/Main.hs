@@ -1,111 +1,144 @@
-import Control.Arrow
-import Control.Monad
-import Data.Bifunctor
-import Data.Either
+import Data.Function.Memoize
 import Data.List
-import Data.Map (valid)
-import Data.Maybe
 import Debug.Trace
 import System.IO
-import Text.ParserCombinators.Parsec
 
-type Range = (Int, Int)
+type Position = (Int, Int)
 
-type Prism = (Range, Range, Range)
+type Amphipod = Char
 
-data Command = On | Off deriving (Show)
+type BoardState = [(Amphipod, Position)]
 
-data Instruction = Instruction Command Prism deriving (Show)
+baseCost :: Amphipod -> Int
+baseCost 'A' = 1
+baseCost 'B' = 10
+baseCost 'C' = 100
+baseCost 'D' = 1000
 
-validRange :: Range -> Bool
-validRange (a, b) = a <= b
+-- Which column do we expect the ampihpods to be in?
+targetColumn :: Amphipod -> Int
+targetColumn 'A' = 3
+targetColumn 'B' = 5
+targetColumn 'C' = 7
+targetColumn 'D' = 9
 
-validPrism :: Prism -> Bool
-validPrism (x, y, z) = all validRange [x, y, z]
+amphipodToChar :: Amphipod -> Char
+amphipodToChar 'A' = 'A'
+amphipodToChar 'B' = 'B'
+amphipodToChar 'C' = 'C'
+amphipodToChar 'D' = 'D'
 
-splitPrism :: Prism -> Prism -> [Prism]
-splitPrism
-  ((x10, x11), (y10, y11), (z10, z11))
-  ((x00, x01), (y00, y01), (z00, z01)) = if hasIntersection then res else [((x00, x01), (y00, y01), (z00, z01))]
-    where
-      hasIntersection =
-        x10 <= x01 && x11 >= x00
-          && y10 <= y01
-          && y11 >= y00
-          && z10 <= z01
-          && z11 >= z00
-      xrange = (max x00 x10, min x01 x11)
-      yrange = (max y00 y10, min y01 y11)
-      p1 = ((x00, x10 - 1), (y00, y01), (z00, z01))
-      p2 = ((x11 + 1, x01), (y00, y01), (z00, z01))
-      p3 = (xrange, (y00, y10 - 1), (z00, z01))
-      p4 = (xrange, (y11 + 1, y01), (z00, z01))
-      p5 = (xrange, yrange, (z00, z10 - 1))
-      p6 = (xrange, yrange, (z11 + 1, z01))
-      res = filter validPrism [p1, p2, p3, p4, p5, p6]
+-- Check if the board state is finished.
+isFinished :: BoardState -> Bool
+isFinished = all (\(a, (x, _)) -> targetColumn a == x)
 
-applyInstruction :: [Prism] -> Instruction -> [Prism]
-applyInstruction prisms (Instruction command prism) =
-  case command of
-    On -> prism : newPrisms
-    _ -> newPrisms
+getAmphipodAtPosition :: BoardState -> Position -> Amphipod
+getAmphipodAtPosition board pos = case find (\(_, p) -> p == pos) board of
+  Just (a, _) -> a
+  _ -> error "Oh no"
+
+getCharAtPosition :: BoardState -> Position -> Char
+getCharAtPosition board pos = case find (\(_, p) -> p == pos) board of
+  Just (a, _) -> amphipodToChar a
+  _ -> '.'
+
+prettyPrintBoard :: BoardState -> String
+prettyPrintBoard board = unlines $ [row1, row2] ++ middleRows ++ [lastRow]
   where
-    newPrisms = concatMap (splitPrism prism) prisms
+    row1 = "#############"
+    row2 = "#" ++ ([getCharAtPosition board (x, 1) | x <- [1 .. 11]]) ++ "#"
+    middleRows =
+      [ "###"
+          ++ intersperse
+            '#'
+            [ getCharAtPosition board (x, y)
+              | x <- [3, 5, 7, 9]
+            ]
+          ++ "###"
+        | y <- [2, 3]
+      ]
+    lastRow = "  #########  "
 
-applyInstructions :: [Instruction] -> [Prism]
-applyInstructions = foldl' applyInstruction []
+-- X cost is computed by total distance traveled. Y cost is computed
+-- by summing the two positions (this depends on the constrints of the
+-- problem).
+moveCost :: (Position, Position) -> Amphipod -> Int
+moveCost ((x0, y0), (x1, y1)) a =
+  (abs (x0 - x1) + (y0 -1) + (y1 -1)) * baseCost a
 
-volume :: Prism -> Int
-volume ((x0, x1), (y0, y1), (z0, z1)) = (x1 - x0 + 1) * (y1 - y0 + 1) * (z1 - z0 + 1)
-
-countOn :: [Prism] -> Int
-countOn = sum . map volume
-
-parseInstructions :: String -> [Instruction]
-parseInstructions = map parseInstruction . lines
-
-parseInstruction :: String -> Instruction
-parseInstruction input = fromRight undefined instructions
+move :: BoardState -> (Position, Position) -> BoardState
+move board (old, new) = sort $ (a, new) : filter (\(_, x) -> x /= old) board
   where
-    instructions = parse instruction "(unknown)" input
+    a = case find (\(_, x) -> x == old) board of
+      (Just (amph, _)) -> amph
+      _ -> error "Bad move"
 
-instruction :: CharParser () Instruction
-instruction = Instruction <$> command <*> (char ' ' *> prism)
+canMove :: BoardState -> (Position, Position) -> Bool
+canMove board ((x0, y0), (x1, y1)) = not (interveningX || interveningY)
+  where
+    start = min x0 x1
+    end = max x0 x1
+    remainingPoints = filter ((/= (x0, y0)) . snd) board
+    interveningX = any (\(_, (x, y)) -> y == 1 && x > start && x < end) remainingPoints
+    interveningY = any (\(_, (x, y)) -> if x == x0 then y <= y0 else (x == x1) && (y <= y1)) remainingPoints
 
-prism :: CharParser () Prism
-prism = toPrism <$> sepBy numberRange (char ',')
+isInFinalPosition :: BoardState -> (Amphipod, Position) -> Bool
+isInFinalPosition board (a, (x, y)) = xTarg && allFilled
+  where
+    xTarg = x == targetColumn a
+    allFilled = all ((== a) . fst) $ filter (\(_, (x0, _)) -> x0 == x) board
 
-toPrism :: [Range] -> Prism
-toPrism [x, y, z] = (x, y, z)
-toPrism _ = error "Bad prism"
+getMovesPiece :: BoardState -> (Amphipod, Position) -> [(Position, Position)]
+getMovesPiece board (a, (x, y))
+  | y == 1 = if all ((== a) . fst) $ filter (\(_, (x0, _)) -> x0 == targetColumn a) board then filter (canMove board) [((x, y), (targetColumn a, 3)), ((x, y), (targetColumn a, 2))] else []
+  | isInFinalPosition board (a, (x, y)) = []
+  | otherwise = filter (canMove board) [((x, y), (x0, 1)) | x0 <- [1, 2, 4, 6, 8, 10, 11]]
 
-command :: CharParser () Command
-command =
-  choice
-    [ string "on" >> return On,
-      string "ff" >> return Off
-    ]
+getMoves :: BoardState -> [(Position, Position)]
+getMoves board = concatMap (getMovesPiece board) board
 
-numberRange :: CharParser () Range
-numberRange =
-  (,) <$> (anyChar *> char '=' *> number)
-    <*> (string ".." *> number)
+-- This works, but needs memoization to actually function efficently...
+optimalCost :: BoardState -> Int
+optimalCost board
+  | isFinished board = trace "done" 0
+  | otherwise = cost
+  where
+    costs =
+      map
+        ( \m ->
+            moveCost m (getAmphipodAtPosition board (fst m))
+              + o1 (move board m)
+        )
+        $ getMoves board
+    cost = if null costs then 1000000 else minimum costs
 
-number :: CharParser () Int
-number = ap sign nat
+o1 = traceMemoize optimalCost
 
-nat :: CharParser () Int
-nat = read <$> many1 digit
+defaultBoard :: BoardState
+defaultBoard =
+  [ ('D', (3, 2)),
+    ('D', (3, 3)),
+    ('C', (5, 2)),
+    ('C', (5, 3)),
+    ('B', (9, 2)),
+    ('B', (7, 3)),
+    ('A', (7, 2)),
+    ('A', (9, 3))
+  ]
 
-sign :: CharParser () (Int -> Int)
-sign = (char '-' >> return negate) <|> (optional (char '+') >> return id)
+mostlySolved :: BoardState
+mostlySolved =
+  [ ('D', (9, 2)),
+    ('D', (9, 3)),
+    ('C', (7, 2)),
+    ('C', (7, 3)),
+    ('B', (3, 2)),
+    ('B', (5, 3)),
+    ('A', (3, 3)),
+    ('A', (5, 2))
+  ]
 
-solution :: String -> Int
-solution = countOn . applyInstructions . parseInstructions
-
-main = do
-  handle <- openFile "input.txt" ReadMode
-  contents <- hGetContents handle
-  print (solution contents)
-  print (length $ applyInstructions $ parseInstructions $ contents)
-  hClose handle
+main =
+  print
+    ( o1 defaultBoard
+    )
