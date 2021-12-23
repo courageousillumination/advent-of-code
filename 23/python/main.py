@@ -80,7 +80,7 @@ def check_column(grid, col, val):
 def is_done(grid):
 
 
-    return (grid[1][2] == grid[2][2] == 'A' and
+    return (check_column(grid, 2, 'A') and
             grid[1][4] == grid[2][4] == 'B' and
             grid[1][6] == grid[2][6] == 'C' and
             grid[1][8] == grid[2][8] == 'D')
