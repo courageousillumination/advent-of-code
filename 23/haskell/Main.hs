@@ -98,21 +98,22 @@ getMoves :: BoardState -> [(Position, Position)]
 getMoves board = concatMap (getMovesPiece board) board
 
 -- This works, but needs memoization to actually function efficently...
-optimalCost :: BoardState -> Int
-optimalCost board
-  | isFinished board = trace "done" 0
+optimalCost :: BoardState -> Int -> Int
+optimalCost board depth
+  | isFinished board = 0
+  | depth > 20 = 1000000
   | otherwise = cost
   where
     costs =
       map
         ( \m ->
             moveCost m (getAmphipodAtPosition board (fst m))
-              + o1 (move board m)
+              + optimalCost (move board m) (depth + 1)
         )
         $ getMoves board
     cost = if null costs then 1000000 else minimum costs
 
-o1 = traceMemoize optimalCost
+-- o1 = memoize optimalCost
 
 defaultBoard :: BoardState
 defaultBoard =
@@ -140,5 +141,4 @@ mostlySolved =
 
 main =
   print
-    ( o1 defaultBoard
-    )
+    (optimalCost defaultBoard 0)
